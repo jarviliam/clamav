@@ -8,6 +8,7 @@ package clamav
 
 /*
 #cgo darwin CPPFLAGS:-Wno-incompatible-pointer-types-discards-qualifiers
+#cgo CFLAGS:-I/usr/local/clamav/include
 #cgo LDFLAGS:-L/usr/local/lib -lclamav
 
 #include <clamav.h>
@@ -290,7 +291,7 @@ func (e *Engine) ScanMapCb(fmap *Fmap, filename string, opts *ScanOptions, conte
 	cfilename := C.CString(filename)
 	defer C.free(unsafe.Pointer(cfilename))
 
-	err := ErrorCode(C.cl_scanmap_callback((*C.cl_fmap_t)(fmap), cFilename, &name, &scanned, (*C.struct_cl_engine)(e), (*C.struct_cl_scan_options)(unsafe.Pointer(opts)), unsafe.Pointer(cctx)))
+	err := ErrorCode(C.cl_scanmap_callback((*C.cl_fmap_t)(fmap), cfilename, &name, &scanned, (*C.struct_cl_engine)(e), (*C.struct_cl_scan_options)(unsafe.Pointer(opts)), unsafe.Pointer(cctx)))
 	if err == Success {
 		return "", 0, nil
 	}
