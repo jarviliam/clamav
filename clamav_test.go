@@ -11,6 +11,11 @@ import (
 	"testing"
 )
 
+var stdopts = &ScanOptions{
+	General: ScanGeneralAllmatches,
+	Parse:   0xFFFF,
+}
+
 func TestRetflevel(t *testing.T) {
 	s := Retflevel()
 	if s < 66 {
@@ -222,7 +227,7 @@ func TestGetSetString(tt *testing.T) {
 				tt.Errorf("GetString: (%d) %v: %v", t, v.set, err)
 			}
 			if v.match && n != v.want {
-				tt.Errorf("GetString: (%d) %v want %d", t, n, v.want)
+				tt.Errorf("GetString: (%d) %v want %v", t, n, v.want)
 			}
 		}
 	}
@@ -242,7 +247,7 @@ func test1(tt *testing.T, eng *Engine, fld EngineField, s string) {
 		tt.Errorf("GetString: (%d) %s: %v", fld, ns, err)
 	}
 	if s != ns {
-		tt.Errorf("GetString: (%d) %s want %d", fld, s, ns)
+		tt.Errorf("GetString: (%d) %s want %v", fld, s, ns)
 	}
 }
 
@@ -379,7 +384,7 @@ func TestScan(t *testing.T) {
 
 	found := false
 	for _, v := range scanFiles {
-		virus, scan, err := eng.ScanFile(v.dir+"/"+v.file, ScanStdopt)
+		virus, scan, err := eng.ScanFile(v.dir+"/"+v.file, stdopts)
 		if err != nil {
 			if virus != "" {
 				if virus != v.name {
@@ -404,7 +409,7 @@ func benchmarkScanFile(b *testing.B, path string) {
 	b.StartTimer()
 
 	for i := 0; i < b.N; i++ {
-		virus, scan, err := eng.ScanFile(path, ScanStdopt)
+		virus, scan, err := eng.ScanFile(path, stdopts)
 		b.SetBytes(int64(scan * CountPrecision))
 		if virus == "" {
 			b.Fatalf("not a virus: %v", err)

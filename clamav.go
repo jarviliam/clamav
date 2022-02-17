@@ -8,7 +8,7 @@ package clamav
 
 /*
 #cgo darwin CPPFLAGS:-Wno-incompatible-pointer-types-discards-qualifiers
-#cgo LDFLAGS:-L/usr/local/lib/x86_64 -lclamav
+#cgo LDFLAGS:-L/usr/local/lib -lclamav
 
 #include <clamav.h>
 #include <stdlib.h>
@@ -100,6 +100,17 @@ func New() *Engine {
 	return eng
 }
 
+// Addref is a thread safety mechanism so that the engine is not free'd by another thread.
+// The engine is initialized with refcount = 1, so this only needs to be called
+// for additional scanning threads.
+func (e *Engine) Addref() error {
+	err := int(C.cl_engine_addref((*C.struct_cl_engine)(e)))
+	if ErrorCode(err) != Success {
+		return fmt.Errorf("%v", StrError(ErrorCode(err)))
+	}
+	return nil
+}
+
 // Free relleases the memory associated with ClamAV. Since the ClamAV
 // engine can consume several megabytes of memory which is not visible
 // by the Go garbage collector, Free should be called when the engine is no
@@ -189,10 +200,12 @@ func (e *Engine) Compile() error {
 }
 
 // ScanDesc scans a file descriptor with the provided engine
-func (e *Engine) ScanDesc(desc int, opts uint) (string, uint, error) {
+func (e *Engine) ScanDesc(filename string, desc int, opts *ScanOptions) (string, uint, error) {
 	var name *C.char
 	var scanned C.ulong
-	err := ErrorCode(C.cl_scandesc(C.int(desc), &name, &scanned, (*C.struct_cl_engine)(e), C.uint(opts)))
+	cFilename := C.CString(filename)
+	defer C.free(unsafe.Pointer(cFilename))
+	err := ErrorCode(C.cl_scandesc(C.int(desc), cFilename, &name, &scanned, (*C.struct_cl_engine)(e), (*C.struct_cl_scan_options)(unsafe.Pointer(opts))))
 	if err == Success {
 		return "", 0, nil
 	}
@@ -207,12 +220,12 @@ func (e *Engine) ScanDesc(desc int, opts uint) (string, uint, error) {
 // If the file is clean the error code will be Success (Clean) and virus name will be empty. If a
 // virus is found the error code will be the corresponding string for Virus (currently "Virus(es)
 // detected").
-func (e *Engine) ScanFile(path string, opts uint) (string, uint, error) {
+func (e *Engine) ScanFile(path string, opts *ScanOptions) (string, uint, error) {
 	var name *C.char
 	var scanned C.ulong
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
-	err := ErrorCode(C.cl_scanfile(cpath, &name, &scanned, (*C.struct_cl_engine)(e), C.uint(opts)))
+	err := ErrorCode(C.cl_scanfile(cpath, &name, &scanned, (*C.struct_cl_engine)(e), (*C.struct_cl_scan_options)(unsafe.Pointer(opts))))
 	if err == Success {
 		return "", 0, nil
 	}
@@ -231,7 +244,7 @@ func (e *Engine) ScanFile(path string, opts uint) (string, uint, error) {
 // detected").
 // The context argument will be sent back to the callbacks, so effort must be made to retain it
 // throughout the execution of the scan from garbage collection
-func (e *Engine) ScanFileCb(path string, opts uint, context interface{}) (string, uint, error) {
+func (e *Engine) ScanFileCb(path string, opts *ScanOptions, context interface{}) (string, uint, error) {
 	var name *C.char
 	var scanned C.ulong
 	// pass a C-allocated pointer to the path to avoid crashing with garbage collector
@@ -244,7 +257,7 @@ func (e *Engine) ScanFileCb(path string, opts uint, context interface{}) (string
 	// cleanup
 	defer deleteContext(cctx)
 
-	err := ErrorCode(C.cl_scanfile_callback(cpath, &name, &scanned, (*C.struct_cl_engine)(e), C.uint(opts), cctx))
+	err := ErrorCode(C.cl_scanfile_callback(cpath, &name, &scanned, (*C.struct_cl_engine)(e), (*C.struct_cl_scan_options)(unsafe.Pointer(opts)), cctx))
 	if err == Success {
 		return "", 0, nil
 	}
@@ -265,7 +278,7 @@ func CloseMemory(f *Fmap) {
 }
 
 // ScanMapCb scans custom data
-func (e *Engine) ScanMapCb(fmap *Fmap, opts uint, context interface{}) (string, uint, error) {
+func (e *Engine) ScanMapCb(fmap *Fmap, filename string, opts *ScanOptions, context interface{}) (string, uint, error) {
 	var name *C.char
 	var scanned C.ulong
 
@@ -274,8 +287,10 @@ func (e *Engine) ScanMapCb(fmap *Fmap, opts uint, context interface{}) (string, 
 	cctx := setContext(context)
 	// cleanup
 	defer deleteContext(cctx)
+	cfilename := C.CString(filename)
+	defer C.free(unsafe.Pointer(cfilename))
 
-	err := ErrorCode(C.cl_scanmap_callback((*C.cl_fmap_t)(fmap), &name, &scanned, (*C.struct_cl_engine)(e), C.uint(opts), unsafe.Pointer(cctx)))
+	err := ErrorCode(C.cl_scanmap_callback((*C.cl_fmap_t)(fmap), cFilename, &name, &scanned, (*C.struct_cl_engine)(e), (*C.struct_cl_scan_options)(unsafe.Pointer(opts)), unsafe.Pointer(cctx)))
 	if err == Success {
 		return "", 0, nil
 	}

@@ -21,6 +21,10 @@ type Settings C.struct_cl_settings
 // ErrorCode models ClamAV errors
 type ErrorCode C.cl_error_t
 
+const (
+	CountPrecision = 4096
+)
+
 // return codes
 const (
 	Success           ErrorCode = C.CL_SUCCESS
@@ -123,43 +127,66 @@ const (
 	DbBytecode         = 0x2000
 	DbSigned           = 0x4000 // internal
 	DbBytecodeUnsigned = 0x8000
-
+	DbUnsigned         = 0x10000 // internal
+	DbBytecodeStats    = 0x20000
+	DbEnhanced         = 0x40000
+	DbPcreStats        = 0x80000
+	DbYaraExclude      = 0x100000
+	DbYaraOnly         = 0x200000
 	// recommended db settings
 	DbStdopt = (DbPhishing | DbPhishingUrls | DbBytecode)
 )
 
-// Scanner options
+type ScanOptions struct {
+	General   uint32
+	Parse     uint32
+	Heuristic uint32
+	Mail      uint32
+	Dev       uint32
+}
+
 const (
-	// scan options
-	ScanRaw                   = 0x0
-	ScanArchive               = 0x1
-	ScanMail                  = 0x2
-	ScanOle2                  = 0x4
-	ScanBlockencrypted        = 0x8
-	ScanHTML                  = 0x10
-	ScanPe                    = 0x20
-	ScanBlockbroken           = 0x40
-	ScanMailurl               = 0x80  // ignored
-	ScanBlockmax              = 0x100 // ignored
-	ScanAlgorithmic           = 0x200
-	ScanPhishingBlockSSL      = 0x800 // ssl mismatches, not ssl by itself
-	ScanPhishingBlockCloak    = 0x1000
-	ScanElf                   = 0x2000
-	ScanPdf                   = 0x4000
-	ScanStructured            = 0x8000
-	ScanStructuredSSNNormal   = 0x10000
-	ScanStructuredSSNStripped = 0x20000
-	ScanPartialMessage        = 0x40000
-	ScanHeuristicPrecedence   = 0x80000
-	ScanBlockmacros           = 0x100000
-	ScanAllmatches            = 0x200000
-	ScanSwf                   = 0x400000
-	ScanPartitionIntxn        = 0x800000
+	// general
+	// ScanGeneralAllmatches scan in all-match mode
+	ScanGeneralAllmatches = 0x1
+	// ScanGeneralHeuristics collect metadata (--gen-json)
+	ScanGeneralCollectMetadata = 0x2
+	// ScanGeneralHeuristics option to enable heuristic alerts
+	ScanGeneralHeuristics = 0x4
+	// ScanGeneralHeuristicsPrecendence allow heuristic match to take precedence
+	ScanGeneralHeuristicsPrecendence = 0x8
 
-	ScanCollectPerformanceInfo = 0x40000000
+	// parsing capabilities options
+	ScanParseArchive = 0x1
+	ScanParseElf     = 0x2
+	ScanParsePdf     = 0x4
+	ScanParseSwf     = 0x8
+	ScanParseHwp3    = 0x10
+	ScanParseXMLDocs = 0x20
+	ScanParseMail    = 0x40
+	ScanParseOle2    = 0x80
+	ScanParseHTML    = 0x100
+	ScanParsePE      = 0x200
 
-	// recommended scan settings
-	ScanStdopt = (ScanArchive | ScanMail | ScanOle2 | ScanPdf | ScanHTML | ScanPe | ScanAlgorithmic | ScanElf | ScanSwf)
+	// heuristic alerting options
+	ScanHeuristicBroken                = 0x2   // alert on broken PE and broken ELF files
+	ScanHeuristicExceedsMax            = 0x4   // alert when files exceed scan limits (filesize, max scansize, or max recursion depth)
+	ScanHeuristicPhishingSSLMismatch   = 0x8   // alert on SSL mismatches
+	ScanHeuristicPhishingCloak         = 0x10  // alert on cloaked URLs in emails
+	ScanHeuristicMacros                = 0x20  // alert on OLE2 files containing macros
+	ScanHeuristicEncryptedArchive      = 0x40  // alert if archive is encrypted (rar, zip, etc)
+	ScanHeuristicEncryptedDoc          = 0x80  // alert if a document is encrypted (pdf, docx, etc)
+	ScanHeuristicPartitionIntxn        = 0x100 // alert if partition table size doesn't make sense
+	ScanHeuristicStructure             = 0x200 // data loss prevention options, i.e. alert when detecting personal information
+	ScanHeuristicStructuredSSNNormal   = 0x400 // alert when detecting social security numbers
+	ScanHeuristicStructuredSSNStripped = 0x800 // alert when detecting stripped social security numbers
+
+	// mail scanning options
+	ScanMailPartialMessage = 0x1
+
+	// dev options
+	ScanDevCollectSHA             = 0x1 // Enables hash output in sha-collect builds - for internal use only
+	ScanDevCollectPerformanceInfo = 0x2 // collect performance timings
 )
 
 // Signature count options
@@ -176,6 +203,8 @@ const (
 	EngineOptionsDisableCache
 	EngineOptionsForceToDisk
 	EngineOptionsDisablePEStats
+	EngineOptionsDisablePECerts
+	EngineOptionsPEDumpCerts
 )
 
 // Engine fields
